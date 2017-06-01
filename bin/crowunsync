@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+set -eux
+
+export REPO_NAME=${REPO:-openstack}
+export REMOTE_PATH=/root/crowbar-${REPO_NAME}
+export CROWBAR_HOST=root@crowbar.c20.cloud.suse.de
+
+function _ssh_cmd() {
+    cmd="$@"
+    cmd="$cmd || exit 1"
+    ssh $CROWBAR_HOST "$cmd" || exit 1
+}
+
+# Copy the default data bags to reset the schema revision number
+_ssh_cmd 'test -d /opt/dell.orig && rsync -a /opt/dell.orig/chef/data_bags/crowbar/*.{json,schema} /opt/dell/chef/data_bags/crowbar/'
+
+if [ ! $? ] ; then
+    echo "No backup was made, cannot restore."
+    exit 1
+fi
+
+# Migrate data bags
+_ssh_cmd 'cd /opt/dell/crowbar_framework ; RAILS_ENV=production bin/rake crowbar:schema_migrate' || return 1
+
+# After successful schema downgrade, fully restore old repo
+_ssh_cmd 'mv /opt/dell /opt/dell.`date +%s` && rsync -a /opt/dell.orig/ /opt/dell'
+
+# Upload cookbooks
+_ssh_cmd "knife cookbook upload -a -o ${REMOTE_PATH}/chef/cookbooks" || return 1
+
+# Restart crowbar
+_ssh_cmd 'systemctl restart crowbar && sleep 5' || return 1

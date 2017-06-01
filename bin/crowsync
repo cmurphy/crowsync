@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -eux
+
+export REPO_NAME=${REPO:-openstack}
+export REMOTE_PATH=/root/crowbar-${REPO_NAME}
+export CROWBAR_HOST=root@crowbar.c20.cloud.suse.de
+
+function _ssh_cmd() {
+    cmd="$@"
+    cmd="$cmd || exit 1"
+    ssh $CROWBAR_HOST "$cmd" || exit 1
+}
+
+if ! (git status &>/dev/null && basename `pwd` | grep $REPO_NAME) ; then
+    echo "Run this from the root of the crowbar repository."
+    exit 1
+fi
+
+# Copy local to remote
+rsync -PHaz ../${REPO_NAME}/ ${CROWBAR_HOST}:${REMOTE_PATH}
+
+# Copy original to backup
+_ssh_cmd 'test -d /opt/dell.orig || cp -a /opt/dell /opt/dell.orig'
+
+# Copy current to backup
+_ssh_cmd 'test -d /opt/dell.bak || cp -a /opt/dell /opt/dell.bak'
+
+# Install utils
+_ssh_cmd 'test -e /root/utils_installed || zypper --non-interactive install git-core patch && touch /root/utils_installed'
+
+# Do a dry run
+_ssh_cmd "cd $REMOTE_PATH && git diff upstream/master | patch --dry-run -N --merge -p1 -d /opt/dell"
+
+# Patch it for real
+_ssh_cmd "cd $REMOTE_PATH && git diff upstream/master | patch -N --merge -p1 -d /opt/dell"
+
+# Migrate data bags
+_ssh_cmd 'cd /opt/dell/crowbar_framework ; RAILS_ENV=production bin/rake crowbar:schema_migrate'
+
+# Upload cookbooks
+_ssh_cmd "knife cookbook upload -a -o ${REMOTE_PATH}/chef/cookbooks"
+
+# Restart crowbar
+_ssh_cmd 'systemctl restart crowbar && sleep 5'
+
+# Clean up
+_ssh_cmd 'rm -r /opt/dell.bak'
