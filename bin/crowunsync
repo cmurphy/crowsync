@@ -27,7 +27,7 @@ _ssh_cmd 'cd /opt/dell/crowbar_framework ; RAILS_ENV=production bin/rake crowbar
 _ssh_cmd 'mv /opt/dell /opt/dell.`date +%s` && rsync -a /opt/dell.orig/ /opt/dell'
 
 # Upload cookbooks
-_ssh_cmd "knife cookbook upload -a -o ${REMOTE_PATH}/chef/cookbooks" || return 1
+_ssh_cmd "knife cookbook upload -a -o /opt/dell/chef/cookbooks" || return 1
 
 # Restart crowbar
 _ssh_cmd 'systemctl restart crowbar && sleep 5' || return 1
