@@ -1,9 +1,7 @@
-Crowbar Sync
-============
+DELETED
+=======
 
-Remotely sync crowbar changes and refresh the system.
+This script was tailored to my personal environment and is not suitable to
+general use. Its existence is causing confusion so I am removing it.
 
-**This is not an official SUSE Cloud developer tool.**
-
-Please read the script to understand how it works and use it to write your own
-that fits with your workflow.
+Please follow the [barclamp development guide](https://github.com/crowbar/crowbar/blob/master/doc/barclamp.md).
